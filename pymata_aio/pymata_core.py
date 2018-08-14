@@ -1706,13 +1706,15 @@ class PymataCore:
         # store the value
         self.query_reply_data[PrivateConstants.REPORT_FIRMWARE] = version_string
 
-    async def _report_version(self):
+    async def _report_version(self, sysex_data=None):
         """
         This is a private message handler method.
         This method reads the following 2 bytes after the report version
         command (0xF9 - non sysex).
         The first byte is the major number and the second byte is the
         minor number.
+
+        :param sysex_data: Sysex data sent from Firmata
 
         :returns: None
         """
