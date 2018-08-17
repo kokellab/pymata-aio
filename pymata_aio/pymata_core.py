@@ -32,6 +32,9 @@ from pymata_aio.pymata_serial import PymataSerial
 from pymata_aio.pymata_socket import PymataSocket
 
 
+logger = logging.getLogger('pymata')
+
+
 # noinspection PyCallingNonCallable,PyCallingNonCallable,PyPep8,PyBroadException,PyBroadException,PyCompatibility
 class PymataCore:
     """
@@ -78,17 +81,10 @@ class PymataCore:
         """
         # check to make sure that Python interpreter is version 3.5 or greater
         python_version = sys.version_info
-        if python_version[0] >= 3:
-            if python_version[1] >= 5:
-                pass
-            else:
-                print(
-                    "ERROR: Python 3.5 or greater is required for use of this program.")
+        if python_version[0] >= 3 and python_version[1] < 5:
+            raise ValueError("ERROR: Python 3.5 or greater is required for use of this program.")
 
         self.log_output = log_output
-        if log_output:
-            logging.basicConfig(filename='./pymata_aio.log', filemode='w',
-                                level=logging.DEBUG)
 
         self.sleep_tune = sleep_tune
         self.arduino_wait = arduino_wait
@@ -202,18 +198,14 @@ class PymataCore:
         #                                   latched_data, time_stamp]
 
         self.latch_map = {}
-
+        
+        log_string = 'pymata_aio Version ' + \
+                     PrivateConstants.PYMATA_VERSION + \
+                     ' Copyright (c) 2015-2018 Alan Yorinks All rights reserved.'
         if self.log_output:
-            log_string = 'pymata_aio Version ' + \
-                         PrivateConstants.PYMATA_VERSION + \
-                         ' Copyright (c) 2015-2018 Alan Yorinks All rights reserved.'
-            logging.info(log_string)
+            logger.info(log_string)
         else:
-
-            print('{}{}{}'.format('\n', 'pymata_aio Version ' +
-                                  PrivateConstants.PYMATA_VERSION,
-                                  '\tCopyright (c) 2015-2018 Alan Yorinks All '
-                                  'rights reserved.\n'))
+            print(log_string)
             sys.stdout.flush()
 
         if self.com_port is None and self.ip_address is None:
@@ -222,7 +214,7 @@ class PymataCore:
             if self.log_output:
                 log_string = 'Using Ip Address/Port: ' + self.ip_address + \
                              ':' + str(ip_port)
-                logging.info(log_string)
+                logger.info(log_string)
             else:
                 print('Using Ip Address/Port: ' +
                       self.ip_address + ':' + str(self.ip_port))
@@ -276,7 +268,7 @@ class PymataCore:
                     self.com_port, 57600,
                     self.sleep_tune,
                     self.log_output,
-                    timeout=self.serial_timeout
+                    timeout=self.serial_timeout,
                     write_timeout=self.serial_write_timeout
                 )
                 # set the read and write handles
@@ -286,10 +278,9 @@ class PymataCore:
                 if self.log_output:
                     log_string = 'Cannot instantiate serial interface: ' \
                                  + self.com_port
-                    logging.exception(log_string)
+                    logger.fatal(log_string, exec_info=True)
                 else:
-                    print(
-                        'Cannot instantiate serial interface: ' + self.com_port)
+                    print('Cannot instantiate serial interface: ' + self.com_port)
                 sys.exit(0)
 
         # wait for arduino to go through a reset cycle if need be
@@ -304,8 +295,7 @@ class PymataCore:
 
         firmware_version = self.loop.run_until_complete(self.get_firmware_version())
         if self.log_output:
-            log_string = "\nArduino Firmware ID: " + firmware_version
-            logging.exception(log_string)
+            logger.info("Arduino Firmware ID: " + firmware_version)
         else:
             print("\nArduino Firmware ID: " + firmware_version)
 
@@ -318,10 +308,10 @@ class PymataCore:
             if self.log_output:
                 log_string = '*** Analog map retrieval timed out. ***'
 
-                logging.exception(log_string)
-                log_string = '\nDo you have Arduino connectivity and do you ' \
+                logger.exception(log_string)
+                log_string = 'Do you have Arduino connectivity and do you ' \
                              'have a Firmata sketch uploaded to the board?'
-                logging.exception(log_string)
+                logger.fatal(log_string, exec_info=True)
 
             else:
                 print('*** Analog map retrieval timed out. ***')
@@ -334,12 +324,15 @@ class PymataCore:
                 loop.run_until_complete(asyncio.sleep(.1))
                 loop.close()
                 loop.stop()
-                sys.exit(0)
             except RuntimeError:
                 # this suppresses the Event Loop Is Running message, which may
                 # be a bug in python 3
-                sys.exit(0)
+                logger.fatal("Hit RuntimeError. Stack trace logged with level DEBUG.")
+                logger.debug("RuntimeError", exec_info=True)
             except TypeError:
+                logger.fatal("Hit TypeError. Stack trace logged with level DEBUG.")
+                logger.debug("TypeError", exec_info=True)
+            finally:
                 sys.exit(0)
 
         # custom assemble the pin lists
@@ -350,17 +343,13 @@ class PymataCore:
                 analog_data = PinData()
                 self.analog_pins.append(analog_data)
 
+        log_string = 'Auto-discovery complete. Found ' + \
+                str(len(self.digital_pins)) + ' Digital Pins and ' + \
+                str(len(self.analog_pins)) + ' Analog Pins'
         if self.log_output:
-            log_string = 'Auto-discovery complete. Found ' + \
-                         str(len(self.digital_pins)) + ' Digital Pins and ' + \
-                         str(len(self.analog_pins)) + ' Analog Pins'
-            logging.info(log_string)
+            logger.info(log_string)
         else:
-            print('{} {} {} {} {}'.format('Auto-discovery complete. Found',
-                                          len(self.digital_pins),
-                                          'Digital Pins and',
-                                          len(self.analog_pins),
-                                          'Analog Pins\n\n'))
+            print(log_string)
 
     async def start_aio(self):
         """
@@ -399,10 +388,9 @@ class PymataCore:
                 if self.log_output:
                     log_string = 'Cannot instantiate serial interface: ' + \
                                  self.com_port
-                    logging.exception(log_string)
+                    logger.exception(log_string)
                 else:
-                    print(
-                        'Cannot instantiate serial interface: ' + self.com_port)
+                    print('Cannot instantiate serial interface: ' + self.com_port)
                 sys.exit(0)
 
         # wait for arduino to go through a reset cycle if need be
@@ -418,10 +406,10 @@ class PymataCore:
             if self.log_output:
                 log_string = '*** Firmware Version retrieval timed out. ***'
 
-                logging.exception(log_string)
-                log_string = '\nDo you have Arduino connectivity and do you ' \
+                logger.fatal(log_string)
+                log_string = 'Do you have Arduino connectivity and do you ' \
                              'have a Firmata sketch uploaded to the board?'
-                logging.exception(log_string)
+                logger.fatal(log_string)
 
             else:
                 print('*** Firmware Version retrieval timed out. ***')
@@ -434,18 +422,21 @@ class PymataCore:
                 loop.run_until_complete(asyncio.sleep(.1))
                 loop.stop()
                 loop.close()
-                sys.exit(0)
             except RuntimeError:
                 self.the_task.cancel()
                 time.sleep(1)
                 # this suppresses the Event Loop Is Running message,
                 # which may be a bug in python 3.4.3
-                sys.exit(0)
+                logger.fatal("Hit RuntimeError. Stack trace logged with level DEBUG.")
+                logger.debug("RuntimeError", exec_info=True)
             except TypeError:
+                logger.fatal("Hit TypeError. Stack trace logged with level DEBUG.")
+                logger.debug("TypeError", exec_info=True)
+            finally:
                 sys.exit(0)
         if self.log_output:
-            log_string = "\nArduino Firmware ID: " + firmware_version
-            logging.exception(log_string)
+            log_string = "Arduino Firmware ID: " + firmware_version
+            logger.info(log_string)
         else:
             print("\nArduino Firmware ID: " + firmware_version)
 
@@ -459,10 +450,10 @@ class PymataCore:
             if self.log_output:
                 log_string = '*** Analog map retrieval timed out. ***'
 
-                logging.exception(log_string)
-                log_string = '\nDo you have Arduino connectivity and do you ' \
+                logger.fatal(log_string)
+                log_string = 'Do you have Arduino connectivity and do you ' \
                              'have a Firmata sketch uploaded to the board?'
-                logging.exception(log_string)
+                logger.fatal(log_string)
 
             else:
                 print('*** Analog map retrieval timed out. ***')
@@ -481,8 +472,13 @@ class PymataCore:
                 time.sleep(1)
                 # this suppresses the Event Loop Is Running message,
                 # which may be a bug in python 3.4.3
+                logger.fatal("Hit RuntimeError. Stack trace logged with level DEBUG.")
+                logger.debug("RuntimeError", exec_info=True)
                 sys.exit(0)
             except TypeError:
+                logger.fatal("Hit TypeError. Stack trace logged with level DEBUG.")
+                logger.debug("TypeError", exec_info=True)
+            finally:
                 sys.exit(0)
 
         # custom assemble the pin lists
@@ -497,7 +493,7 @@ class PymataCore:
             log_string = 'Auto-discovery complete. Found ' + \
                          str(len(self.digital_pins)) + ' Digital Pins and ' + \
                          str(len(self.analog_pins)) + ' Analog Pins'
-            logging.info(log_string)
+            logger.info(log_string)
         else:
             print('{} {} {} {} {}'.format('Auto-discovery complete. Found',
                                           len(self.digital_pins),
@@ -1129,7 +1125,7 @@ class PymataCore:
                 if self.log_output:
                     log_string = 'set_pin_mode: callback ignored for ' \
                                  'pin state: ' + pin_state
-                    logging.info(log_string)
+                    logger.warning(log_string)
                 else:
                     print('{} {}'.format('set_pin_mode: callback ignored for '
                                          'pin state:', pin_state))
@@ -1167,7 +1163,7 @@ class PymataCore:
         """
 
         if self.log_output:
-            logging.info('Shutting down ...')
+            logger.info('Shutting down ...')
         else:
             print('Shutting down ...')
 
@@ -1195,7 +1191,8 @@ class PymataCore:
             await asyncio.sleep(sleep_time)
         except RuntimeError:
             if self.log_output:
-                logging.info('sleep exception')
+                logger.warning('Sleep interrupted. Stack trace logged as DEBUG.')
+                logger.debug("RuntimeError", exec_info=True)
             else:
                 print('sleep exception')
             await self.shutdown()
@@ -1242,7 +1239,7 @@ class PymataCore:
         # update the ping data map for this pin
         if len(self.active_sonar_map) > 6:
             if self.log_output:
-                logging.exception('sonar_config: maximum number of '
+                logger.exception('sonar_config: maximum number of '
                                   'devices assigned - ignoring request')
             else:
                 print('sonar_config: maximum number of devices assigned'
@@ -1430,21 +1427,26 @@ class PymataCore:
             except Exception as ex:
                 # A error occurred while transmitting the Firmata message, message arrived invalid.
                 if self.log_output:
-                    logging.exception(ex)
+                    logger.exception(ex)
                 else:
                     print(ex)
                 await self.shutdown()
 
                 await self.serial_port.close()
 
-                print("An exception occurred on the asyncio event loop while receiving data.  Invalid message.")
+                if self.log_output:
+                    logger.error("An exception occurred on the asyncio event loop while receiving data.  Invalid message.")
+                else:
+                    print("An exception occurred on the asyncio event loop while receiving data.  Invalid message.")
                 loop = self.loop
-                for t in asyncio.Task.all_tasks(loop):
-                    t.cancel()
-                loop.run_until_complete(asyncio.sleep(.1))
-                loop.close()
-                loop.stop()
-                sys.exit(0)
+                try:
+                    for t in asyncio.Task.all_tasks(loop):
+                        t.cancel()
+                    loop.run_until_complete(asyncio.sleep(.1))
+                finally:
+                    loop.close()
+                    loop.stop()
+                    sys.exit(0)
 
     '''
     Firmata message handlers
@@ -1789,7 +1791,7 @@ class PymataCore:
             if reply_data:
                 reply += chr(reply_data)
         if self.log_output:
-            logging.info(reply)
+            logger.info(reply)
         else:
             print(reply)
 
@@ -1878,9 +1880,9 @@ class PymataCore:
             except serial.SerialException:
                 if device == 'end':
                     if self.log_output:
-                        logging.exception(
+                        logger.fatal(
                             'Unable to find Serial Port, Please plug in '
-                            'cable or check cable connections.')
+                            'cable or check cable connections.', exec_info=True)
                     else:
                         print('Unable to find Serial Port, Please plug in '
                               'cable or check cable connections.')
@@ -1888,7 +1890,7 @@ class PymataCore:
                     exit()
         if self.log_output:
             log_string = 'Using COM Port: ' + detected
-            logging.info(log_string)
+            logger.info(log_string)
         else:
             print('{}{}\n'.format('Using COM Port:', detected))
         return detected
@@ -1984,7 +1986,7 @@ class PymataCore:
                 result = await self.write(data)
             except():
                 if self.log_output:
-                    logging.exception('cannot send command')
+                    logger.exception('cannot send command')
                 else:
                     print('cannot send command')
         return result

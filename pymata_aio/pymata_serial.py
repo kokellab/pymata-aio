@@ -23,6 +23,9 @@ import logging
 import serial
 
 
+logger = logging.getLogger('pymata')
+
+
 # noinspection PyStatementEffect,PyUnresolvedReferences,PyUnresolvedReferences
 class PymataSerial:
     """
@@ -42,7 +45,7 @@ class PymataSerial:
         """
         self.log_output = log_output
         if self.log_output:
-            logging.info('Initializing Arduino - Please wait...')
+            logger.info('Initializing Arduino - Please wait...')
         else:
             print('Initializing Arduino - Please wait...', end=" ")
         sys.stdout.flush()
@@ -82,7 +85,7 @@ class PymataSerial:
                 await self.close()
                 future.cancel()
                 if self.log_output:
-                    logging.exception('Write exception')
+                    logger.exception('Write exception')
                 else:
                     print('Write exception')
 
@@ -93,9 +96,11 @@ class PymataSerial:
                 loop.stop()
                 loop.close()
                 self.my_serial.close()
-                sys.exit(0)
             except:  # swallow any additional exceptions during shutdown
-                pass
+                logger.error("Hit error during shutdown. Stack trace logged as DEBUG.")
+                logger.debug("Error shutting down", exec_info=True)
+            finally:
+                sys.exit(0)
 
         if result:
             future.set_result(result)
