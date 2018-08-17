@@ -46,7 +46,7 @@ class PymataCore:
 
     def __init__(self, arduino_wait=2, sleep_tune=0.0001, log_output=False,
                  com_port=None, ip_address=None, ip_port=2000,
-                 ip_handshake='*HELLO*'):
+                 ip_handshake='*HELLO*', serial_timeout=1, serial_write_timeout=1):
         """
         This is the "constructor" method for the PymataCore class.
 
@@ -99,6 +99,8 @@ class PymataCore:
             self.ip_address = ip_address
         self.ip_port = int(ip_port)
         self.ip_handshake = ip_handshake
+        self.serial_timeout = serial_timeout
+        self.serial_write_timeout = serial_write_timeout
 
         self.hall_encoder = False
 
@@ -270,9 +272,13 @@ class PymataCore:
                 self.loop.run_until_complete((self.read()))
         else:
             try:
-                self.serial_port = PymataSerial(self.com_port, 57600,
-                                                self.sleep_tune,
-                                                self.log_output)
+                self.serial_port = PymataSerial(
+                    self.com_port, 57600,
+                    self.sleep_tune,
+                    self.log_output,
+                    timeout=self.serial_timeout
+                    write_timeout=self.serial_write_timeout
+                )
                 # set the read and write handles
                 self.read = self.serial_port.read
                 self.write = self.serial_port.write
@@ -784,7 +790,7 @@ class PymataCore:
             while self.query_reply_data.get(
                     PrivateConstants.REPORT_FIRMWARE) == '':
                 elapsed_time = time.time()
-                if elapsed_time - current_time > 2:
+                if elapsed_time - current_time > 4:
                     return None
                 await asyncio.sleep(self.sleep_tune)
         reply = ''
