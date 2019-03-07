@@ -7,8 +7,13 @@ with open('pypi_desc.md') as f:
 setup(
     name='pymata-aio',
     version='5.0',
-    packages=['pymata_aio'],
+    packages=['pymata_aio', 'utilities'],
     install_requires=['pyserial', 'websockets'],
+    entry_points={
+        'console_scripts': [
+            'list_serial_ports = utilities.list_serial_ports:lsp',
+        ]
+    },
     url='https://github.com/MrYsLab/pymata-aio/wiki',
     download_url='https://github.com/MrYsLab/pymata-aio',
     license='GNU Affero General Public License v3 or later (AGPLv3+)',

@@ -49,8 +49,7 @@ class PymataSerial:
         else:
             print('Initializing Arduino - Please wait...', end=" ")
         sys.stdout.flush()
-        self.my_serial = serial.Serial(com_port, speed, timeout=timeout,
-                                       writeTimeout=write_timeout)
+        self.my_serial = serial.Serial(com_port, speed, timeout=timeout, writeTimeout=write_timeout)
 
         #print("timeouts are {} and {}".format(timeout, write_timeout))
         self.com_port = com_port
