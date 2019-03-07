@@ -44,7 +44,7 @@ class PymataCore:
     perform Arduino pin auto-detection.
     """
 
-    def __init__(self, arduino_wait=2, sleep_tune=0.0001, log_output=False,
+    def __init__(self, arduino_wait=4, sleep_tune=0.0001, log_output=False,
                  com_port=None, ip_address=None, ip_port=2000,
                  ip_handshake='*HELLO*', timeout=1, writeTimeout=1):
         """
@@ -225,6 +225,13 @@ class PymataCore:
             else:
                 print('Using Ip Address/Port: ' +
                       self.ip_address + ':' + str(self.ip_port))
+        elif self.com_port is not None:
+            if self.log_output:
+                log_string = 'Using COM Port: ', self.com_port
+                logging.info(log_string)
+            else:
+                print('{}{}\n'.format('Using COM Port:', self.com_port))
+
 
         self.sleep_tune = sleep_tune
 
@@ -245,6 +252,8 @@ class PymataCore:
         self.keep_alive_interval = 0
         self.period = 0
         self.margin = 0
+
+        self.first_analog_pin = None
 
         # set up signal handler for controlC
         self.loop = asyncio.get_event_loop()
@@ -285,6 +294,7 @@ class PymataCore:
                 else:
                     print(
                         'Cannot instantiate serial interface: ' + self.com_port)
+                    print('To see a list of serial ports, type: "list_serial_ports" in your console.')
                 sys.exit(0)
 
         # wait for arduino to go through a reset cycle if need be
@@ -295,19 +305,20 @@ class PymataCore:
         self.the_task = self.loop.create_task(self._command_dispatcher())
 
         # get arduino firmware version and print it
-        asyncio.ensure_future(self.get_firmware_version())
+        try:
+            firmware_version = self.loop.run_until_complete(self.get_firmware_version())
+            if self.log_output:
+                log_string = "\nArduino Firmware ID: " + firmware_version
+                logging.exception(log_string)
+            else:
+                print("\nArduino Firmware ID: " + firmware_version)
+        except TypeError:
+            print('\nIs your serial cable plugged in and do you have the correct Firmata sketch loaded?')
+            print('Is the COM port correct?')
+            print('To see a list of serial ports, type: "list_serial_ports" in your console.')
+            sys.exit(0)
 
-        firmware_version = self.loop.run_until_complete(self.get_firmware_version())
-        if self.log_output:
-            log_string = "\nArduino Firmware ID: " + firmware_version
-            logging.exception(log_string)
-        else:
-            print("\nArduino Firmware ID: " + firmware_version)
-
-        # get an analog pin map
-        asyncio.ensure_future(self.get_analog_map())
-
-        # try to get an analog report. if it comes back as none - shutdown
+        # try to get an analog pin map. if it comes back as none - shutdown
         report = self.loop.run_until_complete(self.get_analog_map())
         if not report:
             if self.log_output:
@@ -356,6 +367,7 @@ class PymataCore:
                                           'Digital Pins and',
                                           len(self.analog_pins),
                                           'Analog Pins\n\n'))
+        self.first_analog_pin = len(self.digital_pins) - len(self.analog_pins)
 
     async def start_aio(self):
         """
@@ -420,8 +432,10 @@ class PymataCore:
 
             else:
                 print('*** Firmware Version retrieval timed out. ***')
-                print('\nDo you have Arduino connectivity and do you have a '
-                      'Firmata sketch uploaded to the board?')
+                print('\nDo you have Arduino connectivity and do you have a ')
+                print('Firmata sketch uploaded to the board and are connected')
+                print('to the correct serial port.\n')
+                print('To see a list of serial ports, type: "list_serial_ports" in your console.')
             try:
                 loop = self.loop
                 for t in asyncio.Task.all_tasks(loop):
@@ -444,10 +458,7 @@ class PymataCore:
         else:
             print("\nArduino Firmware ID: " + firmware_version)
 
-        # get an analog pin map
-        asyncio.ensure_future(self.get_analog_map())
-
-        # try to get an analog report. if it comes back as none - shutdown
+        # try to get an analog pin map. if it comes back as none - shutdown
         # report = await self.get_analog_map()
         report = await self.get_analog_map()
         if not report:
@@ -461,8 +472,10 @@ class PymataCore:
 
             else:
                 print('*** Analog map retrieval timed out. ***')
-                print('\nDo you have Arduino connectivity and do you have a '
-                      'Firmata sketch uploaded to the board?')
+                print('\nDo you have Arduino connectivity and do you have a ')
+                print( 'Firmata sketch uploaded to the board and are connected')
+                print( 'to the correct serial port.\n')
+                print('To see a list of serial ports, type: "list_serial_ports" in your console.')
             try:
                 loop = self.loop
                 for t in asyncio.Task.all_tasks(loop):
@@ -499,6 +512,8 @@ class PymataCore:
                                           'Digital Pins and',
                                           len(self.analog_pins),
                                           'Analog Pins\n\n'))
+
+        self.first_analog_pin = len(self.digital_pins) - len(self.analog_pins)
 
     async def analog_read(self, pin):
         """
@@ -785,15 +800,9 @@ class PymataCore:
             while self.query_reply_data.get(
                     PrivateConstants.REPORT_FIRMWARE) == '':
                 elapsed_time = time.time()
-                if elapsed_time - current_time > 2:
+                if elapsed_time - current_time > 4:
                     return None
                 await asyncio.sleep(self.sleep_tune)
-        reply = ''
-        for x in self.query_reply_data.get(PrivateConstants.REPORT_FIRMWARE):
-            reply_data = ord(x)
-            if reply_data:
-                reply += chr(reply_data)
-        self.query_reply_data[PrivateConstants.REPORT_FIRMWARE] = reply
         return self.query_reply_data.get(PrivateConstants.REPORT_FIRMWARE)
 
     async def get_protocol_version(self):
@@ -876,7 +885,7 @@ class PymataCore:
         device it will be sent to the callback method.
         Some devices require that transmission be restarted
         (e.g. MMA8452Q accelerometer).
-        Use Constants.I2C_READ | Constants.I2C_RESTART_TX for those cases.
+        Use Constants.I2C_READ | Constants.I2C_END_TX_MASK for those cases.
 
         :param address: i2c device address
 
@@ -884,7 +893,7 @@ class PymataCore:
 
         :param number_of_bytes: number of bytes expected to be returned
 
-        :param read_type: I2C_READ  or I2C_READ_CONTINUOUSLY. I2C_RESTART_TX
+        :param read_type: I2C_READ  or I2C_READ_CONTINUOUSLY. I2C_END_TX_MASK
                           may be OR'ed when required
 
         :param cb: Optional callback function to report i2c data as a
@@ -1002,7 +1011,7 @@ class PymataCore:
         try:
             await self._send_command([PrivateConstants.SYSTEM_RESET])
         except RuntimeError:
-            exit(0)
+            sys.exit(0)
 
     async def servo_config(self, pin, min_pulse=544, max_pulse=2400):
         """
@@ -1130,6 +1139,10 @@ class PymataCore:
                                          'pin state:', pin_state))
 
         pin_mode = pin_state
+
+        if pin_mode == Constants.ANALOG:
+            pin_number = pin_number + self.first_analog_pin
+
         command = [PrivateConstants.SET_PIN_MODE, pin_number, pin_mode]
         await self._send_command(command)
         if pin_state == Constants.ANALOG:
@@ -1138,6 +1151,8 @@ class PymataCore:
             await self.enable_digital_reporting(pin_number)
         else:
             pass
+
+        await self.sleep(.05)
 
     async def set_sampling_interval(self, interval):
         """
@@ -1214,7 +1229,7 @@ class PymataCore:
         :param cb: optional callback function to report sonar data changes
 
         :param ping_interval: Minimum interval between pings. Lowest number
-                              to use is 33 ms.Max is 127
+                              to use is 33 ms. Max is 127ms.
 
         :param max_distance: Maximum distance in cm. Max is 200.
 
@@ -1409,8 +1424,8 @@ class PymataCore:
                 # handle the digital message
                 elif 0x90 <= next_command_byte <= 0x9F:
                     command = []
-                    pin = next_command_byte & 0x0f
-                    command.append(pin)
+                    port = next_command_byte & 0x0f
+                    command.append(port)
                     command = await self._wait_for_data(command, 2)
                     await self._digital_message(command)
                 # handle all other messages by looking them up in the
@@ -1699,11 +1714,12 @@ class PymataCore:
         #  number up until, but not including the END_SYSEX byte
 
         name = sysex_data[3:-1]
+        firmware_name_iterator = iter(name)
 
-        # convert the identifier to printable text and add each character
-        # to the version string
-        for e in name:
-            version_string += chr(e)
+        # convert each element from two 7-bit bytes into characters, then add each
+        # character to the version string
+        for e in firmware_name_iterator:
+            version_string += chr(e + (next(firmware_name_iterator) << 7))
 
         # store the value
         self.query_reply_data[PrivateConstants.REPORT_FIRMWARE] = version_string
@@ -1850,7 +1866,7 @@ class PymataCore:
             locations.append('end')
         # for everyone else, here is a list of possible ports
         else:
-            locations = ['dev/ttyACM0', '/dev/ttyACM0', '/dev/ttyACM1',
+            locations = ['/dev/ttyACM0', '/dev/ttyACM1',
                          '/dev/ttyACM2', '/dev/ttyACM3', '/dev/ttyACM4',
                          '/dev/ttyACM5', '/dev/ttyUSB0', '/dev/ttyUSB1',
                          '/dev/ttyUSB2', '/dev/ttyUSB3', '/dev/ttyUSB4',
@@ -1881,8 +1897,7 @@ class PymataCore:
                     else:
                         print('Unable to find Serial Port, Please plug in '
                               'cable or check cable connections.')
-                    detected = None
-                    exit()
+                    sys.exit()
         if self.log_output:
             log_string = 'Using COM Port: ' + detected
             logging.info(log_string)
