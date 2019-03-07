@@ -201,7 +201,8 @@ class PymataCore:
         
         log_string = 'pymata_aio Version ' + \
                      PrivateConstants.PYMATA_VERSION + \
-                     ' Copyright (c) 2015-2018 Alan Yorinks All rights reserved.'
+                     ' Copyright (c) 2015-2018 Alan Yorinks All rights reserved.' + \
+                     ' Modified for Kokel Lab.'
         if self.log_output:
             logger.info(log_string)
         else:
@@ -281,7 +282,7 @@ class PymataCore:
                     logger.fatal(log_string, exec_info=True)
                 else:
                     print('Cannot instantiate serial interface: ' + self.com_port)
-                sys.exit(0)
+                raise
 
         # wait for arduino to go through a reset cycle if need be
         time.sleep(self.arduino_wait)
@@ -1177,7 +1178,9 @@ class PymataCore:
             self.loop.close()
         except:
             pass
-        sys.exit(0)
+        # REMOVED BY KOKEL LAB
+        # DO NOT DO THIS!!!
+        #sys.exit(0)
 
     async def sleep(self, sleep_time):
         """
@@ -1193,9 +1196,8 @@ class PymataCore:
             if self.log_output:
                 logger.warning('Sleep interrupted. Stack trace logged as DEBUG.')
                 logger.debug("RuntimeError", exec_info=True)
-            else:
-                print('sleep exception')
             await self.shutdown()
+            raise
 
     async def sonar_config(self, trigger_pin, echo_pin, cb=None,
                            ping_interval=50, max_distance=200, cb_type=None):
@@ -1430,9 +1432,9 @@ class PymataCore:
                     logger.exception(ex)
                 else:
                     print(ex)
-                await self.shutdown()
+                #await self.shutdown()
 
-                await self.serial_port.close()
+                #await self.serial_port.close()
 
                 if self.log_output:
                     logger.error("An exception occurred on the asyncio event loop while receiving data.  Invalid message.")
@@ -1444,9 +1446,10 @@ class PymataCore:
                         t.cancel()
                     loop.run_until_complete(asyncio.sleep(.1))
                 finally:
-                    loop.close()
                     loop.stop()
-                    sys.exit(0)
+                    loop.close()
+                    raise ex
+                    #sys.exit(0)
 
     '''
     Firmata message handlers

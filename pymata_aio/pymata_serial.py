@@ -52,6 +52,7 @@ class PymataSerial:
         self.my_serial = serial.Serial(com_port, speed, timeout=timeout,
                                        writeTimeout=write_timeout)
 
+        #print("timeouts are {} and {}".format(timeout, write_timeout))
         self.com_port = com_port
         self.sleep_tune = sleep_tune
 
@@ -100,6 +101,7 @@ class PymataSerial:
                 logger.error("Hit error during shutdown. Stack trace logged as DEBUG.")
                 logger.debug("Error shutting down", exec_info=True)
             finally:
+                print("pymata serial exit")
                 sys.exit(0)
 
         if result:
