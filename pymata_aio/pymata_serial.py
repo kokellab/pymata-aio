@@ -32,7 +32,7 @@ class PymataSerial:
     """
 
     def __init__(self, com_port='/dev/ttyACM0', speed=57600, sleep_tune=.001,
-                 log_output=False):
+                 log_output=False, timeout=1, writeTimeout=1):
         """
         This is the constructor for the aio serial handler
 
@@ -46,8 +46,8 @@ class PymataSerial:
         else:
             print('Initializing Arduino - Please wait...', end=" ")
         sys.stdout.flush()
-        self.my_serial = serial.Serial(com_port, speed, timeout=1,
-                                       writeTimeout=1)
+        self.my_serial = serial.Serial(com_port, speed, timeout=timeout,
+                                       writeTimeout=writeTimeout)
 
         self.com_port = com_port
         self.sleep_tune = sleep_tune

@@ -46,7 +46,7 @@ class PymataCore:
 
     def __init__(self, arduino_wait=2, sleep_tune=0.0001, log_output=False,
                  com_port=None, ip_address=None, ip_port=2000,
-                 ip_handshake='*HELLO*'):
+                 ip_handshake='*HELLO*', timeout=1, writeTimeout=1):
         """
         This is the "constructor" method for the PymataCore class.
 
@@ -99,7 +99,8 @@ class PymataCore:
             self.ip_address = ip_address
         self.ip_port = int(ip_port)
         self.ip_handshake = ip_handshake
-
+        self.timeout = timeout
+        self.writeTimeout = writeTimeout
         self.hall_encoder = False
 
         # this dictionary for mapping incoming Firmata message types to
@@ -272,7 +273,7 @@ class PymataCore:
             try:
                 self.serial_port = PymataSerial(self.com_port, 57600,
                                                 self.sleep_tune,
-                                                self.log_output)
+                                                self.log_output, timeout=self.timeout, writeTimeout=self.writeTimeout)
                 # set the read and write handles
                 self.read = self.serial_port.read
                 self.write = self.serial_port.write
@@ -1175,7 +1176,7 @@ class PymataCore:
             self.loop.close()
         except:
             pass
-        sys.exit(0)
+        #sys.exit(0)
 
     async def sleep(self, sleep_time):
         """
