@@ -6,7 +6,7 @@ with open('pypi_desc.md') as f:
 
 setup(
     name='pymata-aio',
-    version='5.0',
+    version='5.1',
     packages=['pymata_aio', 'utilities'],
     install_requires=['pyserial', 'websockets'],
     entry_points={

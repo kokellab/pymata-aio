@@ -1444,6 +1444,10 @@ class PymataCore:
                     logger.exception(ex)
                 else:
                     print(ex)
+
+                raise ex
+
+                '''
                 #await self.shutdown()
 
                 #await self.serial_port.close()
@@ -1462,6 +1466,7 @@ class PymataCore:
                     loop.close()
                     raise ex
                     #sys.exit(0)
+                '''
 
     '''
     Firmata message handlers
